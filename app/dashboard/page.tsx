@@ -6,19 +6,13 @@ import AddAssetModal from "./AddAssetModal";
 import DeleteButton from "./DeleteButton";
 import Link from "next/link";
 import Countdown from "./Countdown";
-import { Asset, PriceSnapshot } from "@prisma/client";
-
-// 🔥 TYPE FIX
-type AssetWithPrices = Asset & {
-  priceSnapshots: PriceSnapshot[];
-};
 
 export default async function Dashboard() {
   const session = await getServerSession(authOptions);
   if (!session) return <div>No autorizado</div>;
 
-  // 🔥 TIPADO CORRECTO
-  const assetsRaw: AssetWithPrices[] = await prisma.asset.findMany({
+  // 🔥 dejamos que prisma infiera el tipo
+  const assetsRaw = await prisma.asset.findMany({
     where: { isActive: true },
     include: {
       priceSnapshots: {
@@ -28,7 +22,6 @@ export default async function Dashboard() {
     },
   });
 
-  // 🔥 CRON META
   const cronMeta = await prisma.portfolioMetric.findUnique({
     where: { date: new Date(0) },
   });
@@ -45,8 +38,9 @@ export default async function Dashboard() {
     usdToMxn = data?.rates?.MXN ?? 17;
   } catch {}
 
-  const assets = assetsRaw.map((asset: AssetWithPrices) => {
-    const closes = asset.priceSnapshots.map((p: PriceSnapshot) =>
+  // 🔥 aquí forzamos el tipo solo en el map
+  const assets = assetsRaw.map((asset) => {
+    const closes = asset.priceSnapshots.map((p) =>
       Number(p.close)
     );
 
@@ -98,10 +92,8 @@ export default async function Dashboard() {
     };
   });
 
-  // 🔥 ORDEN AUTOMÁTICO
   assets.sort((a, b) => b.score - a.score);
 
-  // 🔥 MEJOR OPORTUNIDAD
   if (assets.length > 0) {
     assets[0].signal = "BUY";
     assets[0].timing = "🔥 Mejor oportunidad actual";
@@ -115,7 +107,6 @@ export default async function Dashboard() {
 
         {/* HEADER */}
         <div className="flex justify-between items-center">
-
           <div>
             <h1 className="text-2xl font-semibold text-[#0F2A36]">
               Dashboard
@@ -125,7 +116,6 @@ export default async function Dashboard() {
               Sistema de decisiones
             </p>
 
-            {/* 🔥 COUNTDOWN SOLO SI EXISTE */}
             {lastRun && (
               <Countdown lastRun={lastRun.toISOString()} />
             )}
@@ -137,7 +127,6 @@ export default async function Dashboard() {
           >
             Ver Tracking
           </Link>
-
         </div>
 
         {/* HERO */}
@@ -247,7 +236,6 @@ export default async function Dashboard() {
           </div>
         </div>
 
-        {/* MODAL */}
         <div className="flex justify-end">
           <AddAssetModal />
         </div>
