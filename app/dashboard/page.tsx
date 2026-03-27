@@ -5,13 +5,20 @@ import { FaArrowUp, FaArrowDown, FaFire } from "react-icons/fa";
 import AddAssetModal from "./AddAssetModal";
 import DeleteButton from "./DeleteButton";
 import Link from "next/link";
-import Countdown from "./Countdown"; // 🔥 NUEVO
+import Countdown from "./Countdown";
+import { Asset, PriceSnapshot } from "@prisma/client";
+
+// 🔥 TYPE FIX
+type AssetWithPrices = Asset & {
+  priceSnapshots: PriceSnapshot[];
+};
 
 export default async function Dashboard() {
   const session = await getServerSession(authOptions);
   if (!session) return <div>No autorizado</div>;
 
-  const assetsRaw = await prisma.asset.findMany({
+  // 🔥 TIPADO CORRECTO
+  const assetsRaw: AssetWithPrices[] = await prisma.asset.findMany({
     where: { isActive: true },
     include: {
       priceSnapshots: {
@@ -26,7 +33,7 @@ export default async function Dashboard() {
     where: { date: new Date(0) },
   });
 
-  const lastRun = cronMeta?.createdAt ?? new Date();
+  const lastRun = cronMeta?.createdAt;
 
   // FX
   let usdToMxn = 17;
@@ -38,8 +45,11 @@ export default async function Dashboard() {
     usdToMxn = data?.rates?.MXN ?? 17;
   } catch {}
 
-  const assets = assetsRaw.map((asset) => {
-    const closes = asset.priceSnapshots.map((p) => Number(p.close));
+  const assets = assetsRaw.map((asset: AssetWithPrices) => {
+    const closes = asset.priceSnapshots.map((p: PriceSnapshot) =>
+      Number(p.close)
+    );
+
     const latest = closes[0];
 
     const smaShort =
@@ -88,10 +98,10 @@ export default async function Dashboard() {
     };
   });
 
-  // ORDEN AUTOMÁTICO
+  // 🔥 ORDEN AUTOMÁTICO
   assets.sort((a, b) => b.score - a.score);
 
-  // FORZAR MEJOR OPCIÓN
+  // 🔥 MEJOR OPORTUNIDAD
   if (assets.length > 0) {
     assets[0].signal = "BUY";
     assets[0].timing = "🔥 Mejor oportunidad actual";
@@ -103,19 +113,22 @@ export default async function Dashboard() {
     <div className="min-h-screen bg-[#F5F6F7] p-6">
       <div className="max-w-5xl mx-auto space-y-6">
 
-        {/* 🔥 HEADER + NAV + COUNTDOWN */}
+        {/* HEADER */}
         <div className="flex justify-between items-center">
 
           <div>
             <h1 className="text-2xl font-semibold text-[#0F2A36]">
               Dashboard
             </h1>
+
             <p className="text-sm text-gray-500">
               Sistema de decisiones
             </p>
 
-            {/* 🔥 COUNTDOWN */}
-            <Countdown lastRun={lastRun.toISOString()} />
+            {/* 🔥 COUNTDOWN SOLO SI EXISTE */}
+            {lastRun && (
+              <Countdown lastRun={lastRun.toISOString()} />
+            )}
           </div>
 
           <Link
@@ -153,62 +166,62 @@ export default async function Dashboard() {
 
         {/* CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {assets.map((asset) => {
-            return (
-              <div
-                key={asset.id}
-                className="relative bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition"
-              >
+          {assets.map((asset) => (
+            <div
+              key={asset.id}
+              className="relative bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition"
+            >
 
-                <DeleteButton id={asset.id} />
+              <DeleteButton id={asset.id} />
 
-                <div className="flex justify-between">
-                  <span className="font-semibold text-[#0F2A36]">
-                    {asset.symbol}
-                  </span>
+              <div className="flex justify-between">
+                <span className="font-semibold text-[#0F2A36]">
+                  {asset.symbol}
+                </span>
 
-                  <span className="text-xs text-gray-400">
-                    Score {asset.score}
-                  </span>
-                </div>
+                <span className="text-xs text-gray-400">
+                  Score {asset.score}
+                </span>
+              </div>
 
-                <p className="text-xs text-gray-500">{asset.name}</p>
+              <p className="text-xs text-gray-500">
+                {asset.name}
+              </p>
 
-                <div className="mt-3 space-y-1">
-                  {asset.latest ? (
-                    <>
-                      <p className="text-lg font-semibold text-gray-900">
-                        ${asset.latest.toFixed(2)} USD
-                      </p>
-
-                      <p className="text-sm text-gray-600">
-                        ${asset.priceMXN?.toFixed(2)} MXN
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-sm text-gray-400">
-                      Cargando precio...
+              <div className="mt-3 space-y-1">
+                {asset.latest ? (
+                  <>
+                    <p className="text-lg font-semibold text-gray-900">
+                      ${asset.latest.toFixed(2)} USD
                     </p>
-                  )}
 
-                  <p className="text-xs text-gray-500">
-                    {asset.momentum.toFixed(2)}%
+                    <p className="text-sm text-gray-600">
+                      ${asset.priceMXN?.toFixed(2)} MXN
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-400">
+                    Cargando precio...
                   </p>
+                )}
 
-                  <div
-                    className={
-                      asset.signal === "BUY"
-                        ? "text-green-600 font-medium text-xs flex items-center gap-1"
-                        : "text-red-600 font-medium text-xs flex items-center gap-1"
-                    }
-                  >
-                    {asset.signal === "BUY" ? <FaArrowUp /> : <FaArrowDown />}
-                    {asset.signal}
-                  </div>
+                <p className="text-xs text-gray-500">
+                  {asset.momentum.toFixed(2)}%
+                </p>
+
+                <div
+                  className={
+                    asset.signal === "BUY"
+                      ? "text-green-600 font-medium text-xs flex items-center gap-1"
+                      : "text-red-600 font-medium text-xs flex items-center gap-1"
+                  }
+                >
+                  {asset.signal === "BUY" ? <FaArrowUp /> : <FaArrowDown />}
+                  {asset.signal}
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
 
         {/* RECOMENDACIONES */}
