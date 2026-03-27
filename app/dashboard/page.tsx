@@ -7,6 +7,18 @@ import DeleteButton from "./DeleteButton";
 import Link from "next/link";
 import Countdown from "./Countdown";
 
+type DashboardAsset = {
+  id: string;
+  symbol: string;
+  name: string;
+  latest?: number;
+  priceMXN?: number | null;
+  score: number;
+  signal: "BUY" | "SELL";
+  timing: string;
+  momentum: number;
+};
+
 export default async function Dashboard() {
   const session = await getServerSession(authOptions);
   if (!session) return <div>No autorizado</div>;
@@ -36,63 +48,62 @@ export default async function Dashboard() {
     usdToMxn = data?.rates?.MXN ?? 17;
   } catch {}
 
-  const assets = assetsRaw.map(
-    (asset: (typeof assetsRaw)[number]) => {
-      const closes = asset.priceSnapshots.map(
-        (p: (typeof asset.priceSnapshots)[number]) =>
-          Number(p.close)
-      );
+  // 🔥 ahora tipamos TODO el array
+  const assets: DashboardAsset[] = assetsRaw.map((asset) => {
+    const closes = asset.priceSnapshots.map((p) => Number(p.close));
 
-      const latest = closes[0];
+    const latest = closes[0];
 
-      const smaShort =
-        closes.slice(0, 5).reduce((a: number, b: number) => a + b, 0) /
-        Math.min(5, closes.length);
+    const smaShort =
+      closes.slice(0, 5).reduce((a: number, b: number) => a + b, 0) /
+      Math.min(5, closes.length);
 
-      const smaLong =
-        closes.slice(0, 20).reduce((a: number, b: number) => a + b, 0) /
-        Math.min(20, closes.length);
+    const smaLong =
+      closes.slice(0, 20).reduce((a: number, b: number) => a + b, 0) /
+      Math.min(20, closes.length);
 
-      const momentum =
-        closes[0] && closes[5]
-          ? ((closes[0] - closes[5]) / closes[5]) * 100
-          : 0;
+    const momentum =
+      closes[0] && closes[5]
+        ? ((closes[0] - closes[5]) / closes[5]) * 100
+        : 0;
 
-      let score = 50;
+    let score = 50;
 
-      if (latest > smaShort) score += 15;
-      if (latest > smaLong) score += 25;
-      if (smaShort > smaLong) score += 20;
-      if (momentum > 0.5) score += 15;
+    if (latest > smaShort) score += 15;
+    if (latest > smaLong) score += 25;
+    if (smaShort > smaLong) score += 20;
+    if (momentum > 0.5) score += 15;
 
-      if (latest < smaShort) score -= 15;
-      if (latest < smaLong) score -= 25;
-      if (momentum < -0.5) score -= 15;
+    if (latest < smaShort) score -= 15;
+    if (latest < smaLong) score -= 25;
+    if (momentum < -0.5) score -= 15;
 
-      let signal = score >= 55 ? "BUY" : "SELL";
+    let signal: "BUY" | "SELL" = score >= 55 ? "BUY" : "SELL";
 
-      let timing =
-        signal === "BUY"
-          ? momentum > 2
-            ? "🔥 Entrada fuerte (1-3 días)"
-            : "Entrada probable (2-5 días)"
-          : momentum < -2
-          ? "⚠️ Caída fuerte (1-3 días)"
-          : "Salida probable (2-5 días)";
+    let timing =
+      signal === "BUY"
+        ? momentum > 2
+          ? "🔥 Entrada fuerte (1-3 días)"
+          : "Entrada probable (2-5 días)"
+        : momentum < -2
+        ? "⚠️ Caída fuerte (1-3 días)"
+        : "Salida probable (2-5 días)";
 
-      return {
-        ...asset,
-        latest,
-        priceMXN: latest ? latest * usdToMxn : null,
-        score,
-        signal,
-        timing,
-        momentum,
-      };
-    }
-  );
+    return {
+      id: asset.id,
+      symbol: asset.symbol,
+      name: asset.name,
+      latest,
+      priceMXN: latest ? latest * usdToMxn : null,
+      score,
+      signal,
+      timing,
+      momentum,
+    };
+  });
 
-  assets.sort((a, b) => b.score - a.score);
+  // 🔥 FIX FINAL (tipado)
+  assets.sort((a: DashboardAsset, b: DashboardAsset) => b.score - a.score);
 
   if (assets.length > 0) {
     assets[0].signal = "BUY";
@@ -160,7 +171,6 @@ export default async function Dashboard() {
               key={asset.id}
               className="relative bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition"
             >
-
               <DeleteButton id={asset.id} />
 
               <div className="flex justify-between">
@@ -213,29 +223,7 @@ export default async function Dashboard() {
           ))}
         </div>
 
-        {/* RECOMENDACIONES */}
-        <div className="bg-white border rounded-xl p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-[#0F2A36] mb-3">
-            Acciones sugeridas
-          </h3>
-
-          <div className="space-y-2">
-            {assets.map((a) => (
-              <div
-                key={a.id}
-                className={
-                  a.signal === "BUY"
-                    ? "p-2 rounded bg-green-50 text-green-700"
-                    : "p-2 rounded bg-red-50 text-red-700"
-                }
-              >
-                {a.signal === "BUY" ? "🟢 Comprar" : "🔴 Vender"}{" "}
-                {a.symbol} — {a.timing}
-              </div>
-            ))}
-          </div>
-        </div>
-
+        {/* MODAL */}
         <div className="flex justify-end">
           <AddAssetModal />
         </div>
