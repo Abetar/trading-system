@@ -11,7 +11,6 @@ export default async function Dashboard() {
   const session = await getServerSession(authOptions);
   if (!session) return <div>No autorizado</div>;
 
-  // 🔥 dejamos que prisma infiera el tipo
   const assetsRaw = await prisma.asset.findMany({
     where: { isActive: true },
     include: {
@@ -38,59 +37,61 @@ export default async function Dashboard() {
     usdToMxn = data?.rates?.MXN ?? 17;
   } catch {}
 
-  // 🔥 aquí forzamos el tipo solo en el map
-  const assets = assetsRaw.map((asset) => {
-    const closes = asset.priceSnapshots.map((p) =>
-      Number(p.close)
-    );
+  // 🔥 TIPADO CORRECTO USANDO typeof
+  const assets = assetsRaw.map(
+    (asset: typeof assetsRaw[number]) => {
+      const closes = asset.priceSnapshots.map((p) =>
+        Number(p.close)
+      );
 
-    const latest = closes[0];
+      const latest = closes[0];
 
-    const smaShort =
-      closes.slice(0, 5).reduce((a, b) => a + b, 0) /
-      Math.min(5, closes.length);
+      const smaShort =
+        closes.slice(0, 5).reduce((a, b) => a + b, 0) /
+        Math.min(5, closes.length);
 
-    const smaLong =
-      closes.slice(0, 20).reduce((a, b) => a + b, 0) /
-      Math.min(20, closes.length);
+      const smaLong =
+        closes.slice(0, 20).reduce((a, b) => a + b, 0) /
+        Math.min(20, closes.length);
 
-    const momentum =
-      closes[0] && closes[5]
-        ? ((closes[0] - closes[5]) / closes[5]) * 100
-        : 0;
+      const momentum =
+        closes[0] && closes[5]
+          ? ((closes[0] - closes[5]) / closes[5]) * 100
+          : 0;
 
-    let score = 50;
+      let score = 50;
 
-    if (latest > smaShort) score += 15;
-    if (latest > smaLong) score += 25;
-    if (smaShort > smaLong) score += 20;
-    if (momentum > 0.5) score += 15;
+      if (latest > smaShort) score += 15;
+      if (latest > smaLong) score += 25;
+      if (smaShort > smaLong) score += 20;
+      if (momentum > 0.5) score += 15;
 
-    if (latest < smaShort) score -= 15;
-    if (latest < smaLong) score -= 25;
-    if (momentum < -0.5) score -= 15;
+      if (latest < smaShort) score -= 15;
+      if (latest < smaLong) score -= 25;
+      if (momentum < -0.5) score -= 15;
 
-    let signal = score >= 55 ? "BUY" : "SELL";
+      let signal = score >= 55 ? "BUY" : "SELL";
 
-    let timing =
-      signal === "BUY"
-        ? momentum > 2
-          ? "🔥 Entrada fuerte (1-3 días)"
-          : "Entrada probable (2-5 días)"
-        : momentum < -2
-        ? "⚠️ Caída fuerte (1-3 días)"
-        : "Salida probable (2-5 días)";
+      let timing =
+        signal === "BUY"
+          ? momentum > 2
+            ? "🔥 Entrada fuerte (1-3 días)"
+            : "Entrada probable (2-5 días)"
+          : momentum < -2
+          ? "⚠️ Caída fuerte (1-3 días)"
+          : "Salida probable (2-5 días)";
 
-    return {
-      ...asset,
-      latest,
-      priceMXN: latest ? latest * usdToMxn : null,
-      score,
-      signal,
-      timing,
-      momentum,
-    };
-  });
+      return {
+        ...asset,
+        latest,
+        priceMXN: latest ? latest * usdToMxn : null,
+        score,
+        signal,
+        timing,
+        momentum,
+      };
+    }
+  );
 
   assets.sort((a, b) => b.score - a.score);
 
