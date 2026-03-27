@@ -27,7 +27,6 @@ export default async function Dashboard() {
 
   const lastRun = cronMeta?.createdAt;
 
-  // FX
   let usdToMxn = 17;
   try {
     const res = await fetch(
@@ -37,7 +36,6 @@ export default async function Dashboard() {
     usdToMxn = data?.rates?.MXN ?? 17;
   } catch {}
 
-  // 🔥 TIPADO COMPLETO
   const assets = assetsRaw.map(
     (asset: (typeof assetsRaw)[number]) => {
       const closes = asset.priceSnapshots.map(
@@ -48,11 +46,11 @@ export default async function Dashboard() {
       const latest = closes[0];
 
       const smaShort =
-        closes.slice(0, 5).reduce((a, b) => a + b, 0) /
+        closes.slice(0, 5).reduce((a: number, b: number) => a + b, 0) /
         Math.min(5, closes.length);
 
       const smaLong =
-        closes.slice(0, 20).reduce((a, b) => a + b, 0) /
+        closes.slice(0, 20).reduce((a: number, b: number) => a + b, 0) /
         Math.min(20, closes.length);
 
       const momentum =
