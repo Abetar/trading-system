@@ -48,62 +48,69 @@ export default async function Dashboard() {
     usdToMxn = data?.rates?.MXN ?? 17;
   } catch {}
 
-  // 🔥 ahora tipamos TODO el array
-  const assets: DashboardAsset[] = assetsRaw.map((asset) => {
-    const closes = asset.priceSnapshots.map((p) => Number(p.close));
+  // 🔥 FIX REAL: tipar asset y p explícitamente
+  const assets: DashboardAsset[] = assetsRaw.map(
+    (asset: any): DashboardAsset => {
+      const closes = asset.priceSnapshots.map(
+        (p: any) => Number(p.close)
+      );
 
-    const latest = closes[0];
+      const latest = closes[0];
 
-    const smaShort =
-      closes.slice(0, 5).reduce((a: number, b: number) => a + b, 0) /
-      Math.min(5, closes.length);
+      const smaShort =
+        closes.slice(0, 5).reduce((a: number, b: number) => a + b, 0) /
+        Math.min(5, closes.length);
 
-    const smaLong =
-      closes.slice(0, 20).reduce((a: number, b: number) => a + b, 0) /
-      Math.min(20, closes.length);
+      const smaLong =
+        closes.slice(0, 20).reduce((a: number, b: number) => a + b, 0) /
+        Math.min(20, closes.length);
 
-    const momentum =
-      closes[0] && closes[5]
-        ? ((closes[0] - closes[5]) / closes[5]) * 100
-        : 0;
+      const momentum =
+        closes[0] && closes[5]
+          ? ((closes[0] - closes[5]) / closes[5]) * 100
+          : 0;
 
-    let score = 50;
+      let score = 50;
 
-    if (latest > smaShort) score += 15;
-    if (latest > smaLong) score += 25;
-    if (smaShort > smaLong) score += 20;
-    if (momentum > 0.5) score += 15;
+      if (latest > smaShort) score += 15;
+      if (latest > smaLong) score += 25;
+      if (smaShort > smaLong) score += 20;
+      if (momentum > 0.5) score += 15;
 
-    if (latest < smaShort) score -= 15;
-    if (latest < smaLong) score -= 25;
-    if (momentum < -0.5) score -= 15;
+      if (latest < smaShort) score -= 15;
+      if (latest < smaLong) score -= 25;
+      if (momentum < -0.5) score -= 15;
 
-    let signal: "BUY" | "SELL" = score >= 55 ? "BUY" : "SELL";
+      const signal: "BUY" | "SELL" =
+        score >= 55 ? "BUY" : "SELL";
 
-    let timing =
-      signal === "BUY"
-        ? momentum > 2
-          ? "🔥 Entrada fuerte (1-3 días)"
-          : "Entrada probable (2-5 días)"
-        : momentum < -2
-        ? "⚠️ Caída fuerte (1-3 días)"
-        : "Salida probable (2-5 días)";
+      const timing =
+        signal === "BUY"
+          ? momentum > 2
+            ? "🔥 Entrada fuerte (1-3 días)"
+            : "Entrada probable (2-5 días)"
+          : momentum < -2
+          ? "⚠️ Caída fuerte (1-3 días)"
+          : "Salida probable (2-5 días)";
 
-    return {
-      id: asset.id,
-      symbol: asset.symbol,
-      name: asset.name,
-      latest,
-      priceMXN: latest ? latest * usdToMxn : null,
-      score,
-      signal,
-      timing,
-      momentum,
-    };
-  });
+      return {
+        id: asset.id,
+        symbol: asset.symbol,
+        name: asset.name,
+        latest,
+        priceMXN: latest ? latest * usdToMxn : null,
+        score,
+        signal,
+        timing,
+        momentum,
+      };
+    }
+  );
 
-  // 🔥 FIX FINAL (tipado)
-  assets.sort((a: DashboardAsset, b: DashboardAsset) => b.score - a.score);
+  assets.sort(
+    (a: DashboardAsset, b: DashboardAsset) =>
+      b.score - a.score
+  );
 
   if (assets.length > 0) {
     assets[0].signal = "BUY";
@@ -160,13 +167,15 @@ export default async function Dashboard() {
               </div>
             </div>
 
-            <p className="text-sm mt-3 opacity-80">{top.timing}</p>
+            <p className="text-sm mt-3 opacity-80">
+              {top.timing}
+            </p>
           </div>
         )}
 
         {/* CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {assets.map((asset) => (
+          {assets.map((asset: DashboardAsset) => (
             <div
               key={asset.id}
               className="relative bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition"
@@ -215,7 +224,11 @@ export default async function Dashboard() {
                       : "text-red-600 font-medium text-xs flex items-center gap-1"
                   }
                 >
-                  {asset.signal === "BUY" ? <FaArrowUp /> : <FaArrowDown />}
+                  {asset.signal === "BUY" ? (
+                    <FaArrowUp />
+                  ) : (
+                    <FaArrowDown />
+                  )}
                   {asset.signal}
                 </div>
               </div>
@@ -223,7 +236,6 @@ export default async function Dashboard() {
           ))}
         </div>
 
-        {/* MODAL */}
         <div className="flex justify-end">
           <AddAssetModal />
         </div>
