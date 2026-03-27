@@ -37,11 +37,12 @@ export default async function Dashboard() {
     usdToMxn = data?.rates?.MXN ?? 17;
   } catch {}
 
-  // 🔥 TIPADO CORRECTO USANDO typeof
+  // 🔥 TIPADO COMPLETO
   const assets = assetsRaw.map(
-    (asset: typeof assetsRaw[number]) => {
-      const closes = asset.priceSnapshots.map((p) =>
-        Number(p.close)
+    (asset: (typeof assetsRaw)[number]) => {
+      const closes = asset.priceSnapshots.map(
+        (p: (typeof asset.priceSnapshots)[number]) =>
+          Number(p.close)
       );
 
       const latest = closes[0];
