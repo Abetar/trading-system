@@ -33,8 +33,9 @@ export default async function Dashboard() {
     },
   });
 
-  const cronMeta = await prisma.portfolioMetric.findUnique({
-    where: { date: new Date(0) },
+  // 🔥 FIX REAL: ya no usamos fecha fija
+  const cronMeta = await prisma.portfolioMetric.findFirst({
+    orderBy: { createdAt: "desc" },
   });
 
   const lastRun = cronMeta?.createdAt;
@@ -48,11 +49,10 @@ export default async function Dashboard() {
     usdToMxn = data?.rates?.MXN ?? 17;
   } catch {}
 
-  // 🔥 FIX REAL: tipar asset y p explícitamente
   const assets: DashboardAsset[] = assetsRaw.map(
     (asset: any): DashboardAsset => {
-      const closes = asset.priceSnapshots.map(
-        (p: any) => Number(p.close)
+      const closes = asset.priceSnapshots.map((p: any) =>
+        Number(p.close)
       );
 
       const latest = closes[0];
@@ -134,6 +134,7 @@ export default async function Dashboard() {
               Sistema de decisiones
             </p>
 
+            {/* ✅ ahora sí se renderiza */}
             {lastRun && (
               <Countdown lastRun={lastRun.toISOString()} />
             )}
@@ -234,6 +235,29 @@ export default async function Dashboard() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* 🔥 RECOMENDACIONES */}
+        <div className="bg-white border rounded-xl p-4 shadow-sm">
+          <h3 className="text-sm font-semibold text-[#0F2A36] mb-3">
+            Recomendaciones
+          </h3>
+
+          <div className="space-y-2">
+            {assets.slice(0, 5).map((a: DashboardAsset) => (
+              <div
+                key={a.id}
+                className={
+                  a.signal === "BUY"
+                    ? "p-2 rounded bg-green-50 text-green-700 text-sm"
+                    : "p-2 rounded bg-red-50 text-red-700 text-sm"
+                }
+              >
+                {a.signal === "BUY" ? "🟢 Comprar" : "🔴 Vender"}{" "}
+                {a.symbol} — {a.timing}
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="flex justify-end">
