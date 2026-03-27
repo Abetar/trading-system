@@ -7,8 +7,6 @@ import DeleteButton from "./DeleteButton";
 import Link from "next/link";
 import Countdown from "./Countdown";
 
-// TEMP DEBUG DEPLOY
-
 type DashboardAsset = {
   id: string;
   symbol: string;
@@ -20,6 +18,42 @@ type DashboardAsset = {
   timing: string;
   momentum: number;
 };
+
+// 🔥 NUEVA FUNCIÓN: MENSAJES ACCIONABLES
+function getActionMessage(asset: DashboardAsset) {
+  const today = new Date();
+
+  const options: Intl.DateTimeFormatOptions = {
+    weekday: "long",
+  };
+
+  const nextDay = new Date(today);
+  nextDay.setDate(today.getDate() + 1);
+
+  const nextNextDay = new Date(today);
+  nextNextDay.setDate(today.getDate() + 2);
+
+  const day1 = nextDay.toLocaleDateString("es-MX", options);
+  const day2 = nextNextDay.toLocaleDateString("es-MX", options);
+
+  if (asset.signal === "BUY") {
+    if (asset.momentum > 2) {
+      return `Si NO tienes posición → compra mañana (${day1}). Se espera subida fuerte.`;
+    }
+
+    return `Si NO tienes posición → considera comprar entre ${day1} y ${day2}.`;
+  }
+
+  if (asset.signal === "SELL") {
+    if (asset.momentum < -2) {
+      return `Si tienes posición → vende mañana (${day1}). Riesgo de caída fuerte.`;
+    }
+
+    return `Si tienes posición → considera vender entre ${day1} y ${day2}.`;
+  }
+
+  return "Sin acción clara";
+}
 
 export default async function Dashboard() {
   const session = await getServerSession(authOptions);
@@ -34,13 +68,6 @@ export default async function Dashboard() {
       },
     },
   });
-
-  // 🔥 FIX REAL: ya no usamos fecha fija
-  const cronMeta = await prisma.portfolioMetric.findFirst({
-    orderBy: { createdAt: "desc" },
-  });
-
-  const lastRun = cronMeta?.createdAt;
 
   let usdToMxn = 17;
   try {
@@ -136,10 +163,7 @@ export default async function Dashboard() {
               Sistema de decisiones
             </p>
 
-            {/* ✅ ahora sí se renderiza */}
-            {lastRun && (
-              <Countdown lastRun={lastRun.toISOString()} />
-            )}
+            <Countdown />
           </div>
 
           <Link
@@ -171,7 +195,7 @@ export default async function Dashboard() {
             </div>
 
             <p className="text-sm mt-3 opacity-80">
-              {top.timing}
+              {getActionMessage(top)}
             </p>
           </div>
         )}
@@ -239,7 +263,7 @@ export default async function Dashboard() {
           ))}
         </div>
 
-        {/* 🔥 RECOMENDACIONES */}
+        {/* RECOMENDACIONES */}
         <div className="bg-white border rounded-xl p-4 shadow-sm">
           <h3 className="text-sm font-semibold text-[#0F2A36] mb-3">
             Recomendaciones
@@ -256,7 +280,7 @@ export default async function Dashboard() {
                 }
               >
                 {a.signal === "BUY" ? "🟢 Comprar" : "🔴 Vender"}{" "}
-                {a.symbol} — {a.timing}
+                {a.symbol} — {getActionMessage(a)}
               </div>
             ))}
           </div>

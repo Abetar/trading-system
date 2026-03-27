@@ -2,39 +2,76 @@
 
 import { useEffect, useState } from "react"
 
-export default function Countdown({ lastRun }: { lastRun: string }) {
-  const interval = 5 * 60 // 5 min
+const INTERVAL_MINUTES = 15
+const POLLING_INTERVAL = 30000 // 30 segundos
 
-  const [secondsLeft, setSecondsLeft] = useState(0)
+export default function Countdown() {
+  const [remaining, setRemaining] = useState<number | null>(null)
+  const [lastRun, setLastRun] = useState<number | null>(null)
 
   useEffect(() => {
-    const update = () => {
-      const last = new Date(lastRun).getTime()
-      const now = Date.now()
+    let countdownInterval: NodeJS.Timeout
+    let pollingInterval: NodeJS.Timeout
 
-      const diff = Math.floor((now - last) / 1000)
-      const remaining = Math.max(interval - diff, 0)
+    async function fetchLastRun() {
+      try {
+        const res = await fetch("/api/cron/last-run")
+        const data = await res.json()
 
-      setSecondsLeft(remaining)
+        if (data.lastRunAt) {
+          const timestamp = new Date(data.lastRunAt).getTime()
 
-      // 🔥 auto refresh real
-      if (remaining === 0) {
-        window.location.reload()
+          // 🔥 solo actualiza si cambió
+          setLastRun((prev) => {
+            if (prev !== timestamp) {
+              return timestamp
+            }
+            return prev
+          })
+        }
+      } catch (err) {
+        console.error("Polling error:", err)
       }
     }
 
-    update()
-    const timer = setInterval(update, 1000)
+    function startCountdown() {
+      countdownInterval = setInterval(() => {
+        if (!lastRun) return
 
-    return () => clearInterval(timer)
+        const now = Date.now()
+        const nextRun = lastRun + INTERVAL_MINUTES * 60 * 1000
+        const diff = nextRun - now
+
+        setRemaining(diff > 0 ? diff : 0)
+      }, 1000)
+    }
+
+    // 🔥 init
+    fetchLastRun()
+    startCountdown()
+
+    // 🔥 polling cada 30s
+    pollingInterval = setInterval(fetchLastRun, POLLING_INTERVAL)
+
+    return () => {
+      clearInterval(countdownInterval)
+      clearInterval(pollingInterval)
+    }
   }, [lastRun])
 
-  const minutes = Math.floor(secondsLeft / 60)
-  const seconds = secondsLeft % 60
+  if (remaining === null) {
+    return <div>Cargando countdown...</div>
+  }
+
+  const minutes = Math.floor(remaining / 60000)
+  const seconds = Math.floor((remaining % 60000) / 1000)
 
   return (
-    <div className="text-xs text-gray-500">
-      Actualización en {minutes}:{seconds.toString().padStart(2, "0")}
+    <div className="text-sm text-gray-500">
+      Próxima actualización en:{" "}
+      <span className="font-semibold">
+        {minutes}:{seconds.toString().padStart(2, "0")}
+      </span>
     </div>
   )
 }
