@@ -7,7 +7,6 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const singleSymbol = searchParams.get("symbol")
 
-    // 🔥 Permite fetch individual o masivo
     const assets = await prisma.asset.findMany({
       where: {
         isActive: true,
@@ -19,6 +18,7 @@ export async function GET(req: Request) {
     today.setHours(0, 0, 0, 0)
 
     const results = []
+    let successCount = 0
 
     for (const asset of assets) {
       try {
@@ -28,14 +28,12 @@ export async function GET(req: Request) {
         const res = await fetch(
           `https://query1.finance.yahoo.com/v8/finance/chart/${symbolToFetch}`,
           {
-            // 🔥 evita requests colgados
             next: { revalidate: 0 },
           }
         )
 
         const data = await res.json()
 
-        // 🔥 VALIDACIÓN REAL
         if (!data?.chart || data.chart.error || !data.chart.result) {
           results.push({
             symbol: asset.symbol,
@@ -58,7 +56,6 @@ export async function GET(req: Request) {
           continue
         }
 
-        // 🔥 UPSERT (correcto)
         await prisma.priceSnapshot.upsert({
           where: {
             assetId_date: {
@@ -76,6 +73,8 @@ export async function GET(req: Request) {
           },
         })
 
+        successCount++
+
         results.push({
           symbol: asset.symbol,
           status: "ok",
@@ -89,12 +88,31 @@ export async function GET(req: Request) {
       }
     }
 
+    // 🔥 SOLO si hubo al menos 1 éxito real
+    if (successCount > 0) {
+      await prisma.cronExecution.upsert({
+        where: {
+          jobName: "price-fetch",
+        },
+        update: {
+          lastRunAt: new Date(),
+        },
+        create: {
+          jobName: "price-fetch",
+          lastRunAt: new Date(),
+        },
+      })
+    }
+
     return NextResponse.json({
-      success: true,
+      success: successCount > 0,
+      successCount,
+      total: assets.length,
       results,
     })
   } catch (error) {
     console.error(error)
+
     return NextResponse.json(
       { error: "Error fetching prices" },
       { status: 500 }

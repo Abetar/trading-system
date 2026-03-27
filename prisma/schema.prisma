@@ -71,7 +71,6 @@ model Signal {
   note      String?
   executed  Boolean @default(false)
 
-  // 🔥 RELACIÓN INVERSA (FIX)
   trades    Trade[]
 
   createdAt DateTime @default(now())
@@ -93,7 +92,6 @@ model Trade {
 
   executedAt DateTime @default(now())
 
-  // 🔥 relación opcional con señal
   signalId  String?
   signal    Signal?   @relation(fields: [signalId], references: [id])
 
@@ -130,4 +128,17 @@ model PortfolioMetric {
   totalTrades     Int?
 
   createdAt DateTime @default(now())
+}
+
+/**
+ * 🔥 NUEVO MODELO PARA CRON
+ * Fuente de verdad para countdown + sincronización
+ */
+model CronExecution {
+  id        String   @id @default(cuid())
+  jobName   String
+  lastRunAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([jobName])
 }
