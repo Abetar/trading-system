@@ -72,7 +72,7 @@ export default async function Dashboard() {
   let usdToMxn = 17;
   try {
     const res = await fetch(
-      "https://api.exchangerate.host/latest?base=USD&symbols=MXN"
+      "https://api.exchangerate.host/latest?base=USD&symbols=MXN",
     );
     const data = await res.json();
     usdToMxn = data?.rates?.MXN ?? 17;
@@ -80,9 +80,7 @@ export default async function Dashboard() {
 
   const assets: DashboardAsset[] = assetsRaw.map(
     (asset: any): DashboardAsset => {
-      const closes = asset.priceSnapshots.map((p: any) =>
-        Number(p.close)
-      );
+      const closes = asset.priceSnapshots.map((p: any) => Number(p.close));
 
       const latest = closes[0];
 
@@ -110,8 +108,7 @@ export default async function Dashboard() {
       if (latest < smaLong) score -= 25;
       if (momentum < -0.5) score -= 15;
 
-      const signal: "BUY" | "SELL" =
-        score >= 55 ? "BUY" : "SELL";
+      const signal: "BUY" | "SELL" = score >= 55 ? "BUY" : "SELL";
 
       const timing =
         signal === "BUY"
@@ -119,8 +116,8 @@ export default async function Dashboard() {
             ? "🔥 Entrada fuerte (1-3 días)"
             : "Entrada probable (2-5 días)"
           : momentum < -2
-          ? "⚠️ Caída fuerte (1-3 días)"
-          : "Salida probable (2-5 días)";
+            ? "⚠️ Caída fuerte (1-3 días)"
+            : "Salida probable (2-5 días)";
 
       return {
         id: asset.id,
@@ -133,13 +130,10 @@ export default async function Dashboard() {
         timing,
         momentum,
       };
-    }
+    },
   );
 
-  assets.sort(
-    (a: DashboardAsset, b: DashboardAsset) =>
-      b.score - a.score
-  );
+  assets.sort((a: DashboardAsset, b: DashboardAsset) => b.score - a.score);
 
   if (assets.length > 0) {
     assets[0].signal = "BUY";
@@ -151,17 +145,12 @@ export default async function Dashboard() {
   return (
     <div className="min-h-screen bg-[#F5F6F7] p-6">
       <div className="max-w-5xl mx-auto space-y-6">
-
         {/* HEADER */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-semibold text-[#0F2A36]">
-              Dashboard
-            </h1>
+            <h1 className="text-2xl font-semibold text-[#0F2A36]">Dashboard</h1>
 
-            <p className="text-sm text-gray-500">
-              Sistema de decisiones
-            </p>
+            <p className="text-sm text-gray-500">Sistema de decisiones</p>
 
             <Countdown />
           </div>
@@ -194,9 +183,7 @@ export default async function Dashboard() {
               </div>
             </div>
 
-            <p className="text-sm mt-3 opacity-80">
-              {getActionMessage(top)}
-            </p>
+            <p className="text-sm mt-3 opacity-80">{getActionMessage(top)}</p>
           </div>
         )}
 
@@ -219,9 +206,7 @@ export default async function Dashboard() {
                 </span>
               </div>
 
-              <p className="text-xs text-gray-500">
-                {asset.name}
-              </p>
+              <p className="text-xs text-gray-500">{asset.name}</p>
 
               <div className="mt-3 space-y-1">
                 {asset.latest ? (
@@ -235,14 +220,14 @@ export default async function Dashboard() {
                     </p>
                   </>
                 ) : (
-                  <p className="text-sm text-gray-400">
-                    Cargando precio...
-                  </p>
+                  <p className="text-sm text-gray-400">Cargando precio...</p>
                 )}
 
-                <p className="text-xs text-gray-500">
-                  {asset.momentum.toFixed(2)}%
-                </p>
+                {Math.abs(asset.momentum) > 0.1 && (
+                  <p className="text-xs text-gray-500">
+                    Momentum: {asset.momentum.toFixed(2)}%
+                  </p>
+                )}
 
                 <div
                   className={
@@ -251,11 +236,7 @@ export default async function Dashboard() {
                       : "text-red-600 font-medium text-xs flex items-center gap-1"
                   }
                 >
-                  {asset.signal === "BUY" ? (
-                    <FaArrowUp />
-                  ) : (
-                    <FaArrowDown />
-                  )}
+                  {asset.signal === "BUY" ? <FaArrowUp /> : <FaArrowDown />}
                   {asset.signal}
                 </div>
               </div>
@@ -279,8 +260,8 @@ export default async function Dashboard() {
                     : "p-2 rounded bg-red-50 text-red-700 text-sm"
                 }
               >
-                {a.signal === "BUY" ? "🟢 Comprar" : "🔴 Vender"}{" "}
-                {a.symbol} — {getActionMessage(a)}
+                {a.signal === "BUY" ? "🟢 Comprar" : "🔴 Vender"} {a.symbol} —{" "}
+                {getActionMessage(a)}
               </div>
             ))}
           </div>
@@ -289,7 +270,6 @@ export default async function Dashboard() {
         <div className="flex justify-end">
           <AddAssetModal />
         </div>
-
       </div>
     </div>
   );
