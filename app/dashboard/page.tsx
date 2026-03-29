@@ -12,6 +12,7 @@ type DashboardAsset = {
   id: string;
   symbol: string;
   name: string;
+  type: string;
   latest?: number;
   priceMXN?: number | null;
   score: number;
@@ -84,7 +85,6 @@ export default async function Dashboard() {
         ? ((closes[0] - closes[5]) / closes[5]) * 100
         : 0;
 
-    // 🔥 retornos diarios en %
     const dailyReturns: number[] = [];
     for (let i = 0; i < closes.length - 1; i++) {
       const current = closes[i];
@@ -96,28 +96,50 @@ export default async function Dashboard() {
       }
     }
 
-    // 🔥 volatilidad simple basada en std dev de retornos
     const volatility = calculateStdDev(dailyReturns);
-
-    // 🔥 movimiento esperado más realista que solo momentum
-    let expectedMove = Math.max(volatility * 0.8, 0.6);
-    expectedMove = Math.min(expectedMove, 4);
 
     const riskLevel = getRiskLevel(volatility);
 
+    // 🔥 expectedMove por tipo
+    let expectedMove: number;
+    if (asset.type === "CRYPTO") {
+      expectedMove = Math.max(volatility * 1.2, 1.5);
+    } else if (asset.type === "REIT") {
+      expectedMove = Math.max(volatility * 0.5, 0.5);
+    } else {
+      expectedMove = Math.max(volatility * 0.8, 0.6);
+    }
+    expectedMove = Math.min(expectedMove, 6);
+
+    // 🔥 score por tipo
     let score = 50;
 
-    if (latest > smaShort) score += 15;
-    if (latest > smaLong) score += 25;
-    if (smaShort > smaLong) score += 20;
-    if (momentum > 0.5) score += 15;
+    if (asset.type === "ETF" || asset.type === "STOCK") {
+      if (latest > smaShort) score += 15;
+      if (latest > smaLong) score += 25;
+      if (smaShort > smaLong) score += 20;
+      if (momentum > 0.5) score += 15;
 
-    if (latest < smaShort) score -= 15;
-    if (latest < smaLong) score -= 25;
-    if (momentum < -0.5) score -= 15;
+      if (latest < smaShort) score -= 15;
+      if (latest < smaLong) score -= 25;
+      if (momentum < -0.5) score -= 15;
+    }
 
-    if (volatility > 3) score -= 10;
-    if (volatility < 1.2) score += 5;
+    if (asset.type === "REIT") {
+      if (latest > smaLong) score += 20;
+      if (momentum > 0) score += 10;
+      if (volatility < 2) score += 10;
+
+      if (momentum < -1) score -= 20;
+    }
+
+    if (asset.type === "CRYPTO") {
+      if (momentum > 1) score += 25;
+      if (momentum > 3) score += 15;
+
+      if (momentum < -2) score -= 25;
+      if (volatility > 4) score -= 10;
+    }
 
     const signal: "BUY" | "SELL" = score >= 55 ? "BUY" : "SELL";
 
@@ -125,6 +147,7 @@ export default async function Dashboard() {
       id: asset.id,
       symbol: asset.symbol,
       name: asset.name,
+      type: asset.type,
       latest,
       priceMXN: latest ? latest * usdToMxn : null,
       score,
@@ -144,8 +167,10 @@ export default async function Dashboard() {
   return (
     <div className="min-h-screen bg-[#F5F6F7] p-6">
       <div className="max-w-5xl mx-auto space-y-6">
+
         {/* HEADER */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+
           <div>
             <h1 className="text-2xl font-semibold text-[#0F2A36]">
               Dashboard
@@ -158,15 +183,19 @@ export default async function Dashboard() {
             <Countdown />
           </div>
 
-          <div className="flex gap-2">
-            <RecommendationsModal assets={assets} />
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+
+            <div className="w-full sm:w-auto">
+              <RecommendationsModal assets={assets} />
+            </div>
 
             <Link
               href="/dashboard/tracking"
-              className="bg-[#0F2A36] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90"
+              className="bg-[#0F2A36] text-white px-4 py-2 rounded-lg text-sm font-medium text-center w-full sm:w-auto"
             >
               Ver operaciones
             </Link>
+
           </div>
         </div>
 
@@ -182,12 +211,11 @@ export default async function Dashboard() {
                 <h2 className="text-2xl font-bold">{top.symbol}</h2>
 
                 <p className="text-sm opacity-80">
-                  Nivel de señal: {top.score} | Tendencia:{" "}
-                  {top.momentum.toFixed(2)}%
+                  Tipo: {top.type} | Score: {top.score}
                 </p>
 
                 <p className="text-sm opacity-80 mt-1">
-                  Movimiento esperado: ±{top.expectedMove.toFixed(2)}% | Riesgo:{" "}
+                  Movimiento: ±{top.expectedMove.toFixed(2)}% | Riesgo:{" "}
                   {top.riskLevel}
                 </p>
               </div>
@@ -212,7 +240,6 @@ export default async function Dashboard() {
             >
               <DeleteButton id={asset.id} />
 
-              {/* HEADER */}
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-[#0F2A36]">
                   {asset.symbol}
@@ -225,7 +252,6 @@ export default async function Dashboard() {
 
               <p className="text-xs text-gray-500">{asset.name}</p>
 
-              {/* PRECIOS */}
               <div className="mt-3 space-y-1">
                 {asset.latest ? (
                   <>
@@ -245,7 +271,7 @@ export default async function Dashboard() {
 
                 {Math.abs(asset.momentum) > 0.1 && (
                   <p className="text-xs text-gray-500">
-                    Tendencia reciente: {asset.momentum.toFixed(2)}%
+                    Tendencia: {asset.momentum.toFixed(2)}%
                   </p>
                 )}
 
@@ -258,10 +284,9 @@ export default async function Dashboard() {
                 </p>
 
                 <p className="text-xs text-gray-500">
-                  Riesgo estimado: {asset.riskLevel}
+                  Riesgo: {asset.riskLevel}
                 </p>
 
-                {/* SEÑAL */}
                 <div
                   className={`text-xs flex items-center gap-1 font-medium ${
                     asset.signal === "BUY"
@@ -283,6 +308,7 @@ export default async function Dashboard() {
         <div className="flex justify-end">
           <AddAssetModal />
         </div>
+
       </div>
     </div>
   );

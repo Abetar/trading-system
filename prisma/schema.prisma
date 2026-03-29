@@ -9,6 +9,8 @@ datasource db {
 enum AssetType {
   ETF
   STOCK
+  REIT
+  CRYPTO
 }
 
 enum SignalAction {

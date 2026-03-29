@@ -1,6 +1,22 @@
 // app/api/prices/fetch/route.ts
+
 import { prisma } from "@/lib/db/prisma"
 import { NextResponse } from "next/server"
+
+// 🔥 MAPEO CENTRALIZADO (ESCALABLE)
+const SYMBOL_MAP: Record<string, string> = {
+  IVVPESO: "IVV",
+
+  // 🇲🇽 FIBRAS
+  FUNO11: "FUNO11.MX",
+  FMTY14: "FMTY14.MX",
+
+  // Puedes agregar más aquí en el futuro
+}
+
+function resolveSymbol(symbol: string) {
+  return SYMBOL_MAP[symbol] ?? symbol
+}
 
 export async function GET(req: Request) {
   try {
@@ -22,8 +38,7 @@ export async function GET(req: Request) {
 
     for (const asset of assets) {
       try {
-        const symbolToFetch =
-          asset.symbol === "IVVPESO" ? "IVV" : asset.symbol
+        const symbolToFetch = resolveSymbol(asset.symbol)
 
         const res = await fetch(
           `https://query1.finance.yahoo.com/v8/finance/chart/${symbolToFetch}`,
@@ -37,6 +52,7 @@ export async function GET(req: Request) {
         if (!data?.chart || data.chart.error || !data.chart.result) {
           results.push({
             symbol: asset.symbol,
+            fetchedSymbol: symbolToFetch,
             status: "invalid_symbol",
           })
           continue
@@ -51,6 +67,7 @@ export async function GET(req: Request) {
         if (!price || isNaN(price)) {
           results.push({
             symbol: asset.symbol,
+            fetchedSymbol: symbolToFetch,
             status: "no_price",
           })
           continue
@@ -77,6 +94,7 @@ export async function GET(req: Request) {
 
         results.push({
           symbol: asset.symbol,
+          fetchedSymbol: symbolToFetch,
           status: "ok",
           price,
         })
