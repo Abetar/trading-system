@@ -31,77 +31,75 @@ export default async function TrackingPage() {
     where: { isActive: true },
   });
 
-  const trades: Trade[] = tradesRaw.map((t: any): Trade => ({
-    id: t.id,
-    side: t.side === "BUY" ? "BUY" : "SELL",
-    entryPrice: Number(t.price),
-    quantity: Number(t.quantity),
-    asset: {
-      symbol: t.asset?.symbol ?? "N/A",
-    },
-  }));
-
-  const assets: Asset[] = assetsRaw.map((a: any): Asset => ({
-    id: a.id,
-    symbol: a.symbol,
-    name: a.name,
-  }));
-
-  const totalProfit = trades.reduce(
-    (acc: number, trade: Trade): number => {
-      if (trade.side === "SELL") {
-        return acc + trade.entryPrice * trade.quantity;
-      }
-      if (trade.side === "BUY") {
-        return acc - trade.entryPrice * trade.quantity;
-      }
-      return acc;
-    },
-    0
+  const trades: Trade[] = tradesRaw.map(
+    (t: any): Trade => ({
+      id: t.id,
+      side: t.side === "BUY" ? "BUY" : "SELL",
+      entryPrice: Number(t.price),
+      quantity: Number(t.quantity),
+      asset: {
+        symbol: t.asset?.symbol ?? "N/A",
+      },
+    }),
   );
+
+  const assets: Asset[] = assetsRaw.map(
+    (a: any): Asset => ({
+      id: a.id,
+      symbol: a.symbol,
+      name: a.name,
+    }),
+  );
+
+  const totalProfit = trades.reduce((acc: number, trade: Trade): number => {
+    if (trade.side === "SELL") {
+      return acc + trade.entryPrice * trade.quantity;
+    }
+    if (trade.side === "BUY") {
+      return acc - trade.entryPrice * trade.quantity;
+    }
+    return acc;
+  }, 0);
 
   return (
     <div className="min-h-screen bg-[#F5F6F7] p-6">
       <div className="max-w-5xl mx-auto space-y-6">
-
         {/* HEADER */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-semibold text-[#0F2A36]">
-              Tracking
-            </h1>
-            <p className="text-sm text-gray-500">
-              Control de operaciones
-            </p>
+            <h1 className="text-2xl font-semibold text-[#0F2A36]">Tracking</h1>
+            <p className="text-sm text-gray-500">Control de operaciones</p>
           </div>
         </div>
 
         {/* KPI RESULTADO */}
         <div className="bg-white border rounded-2xl p-6 shadow-sm">
-          <p className="text-xs text-gray-400 mb-1">
-            Resultado total
-          </p>
+          <p className="text-xs text-gray-500 mb-1">Resultado total</p>
 
           <p
             className={`text-3xl font-semibold ${
-              totalProfit >= 0
-                ? "text-[#2E7D5B]"
-                : "text-[#B23A3A]"
+              totalProfit >= 0 ? "text-[#2E7D5B]" : "text-[#B23A3A]"
             }`}
           >
             ${totalProfit.toFixed(2)}
           </p>
 
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-gray-500 mt-1">
             Basado en operaciones registradas
           </p>
         </div>
 
         {/* FORM */}
-        <div className="bg-white border rounded-2xl p-5 shadow-sm">
-          <p className="text-sm font-medium text-[#0F2A36] mb-3">
-            Registrar operación
-          </p>
+        <div className="bg-white border rounded-2xl p-5 shadow-sm space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-[#0F2A36]">
+              Registrar operación
+            </p>
+            <p className="text-xs text-gray-500">
+              Agrega compras o ventas para calcular tu rendimiento
+            </p>
+          </div>
+
           <TradeForm assets={assets} />
         </div>
 
@@ -112,7 +110,7 @@ export default async function TrackingPage() {
           </div>
 
           {trades.length === 0 && (
-            <div className="p-6 text-sm text-gray-400 text-center">
+            <div className="p-6 text-sm text-gray-500 text-center">
               No hay operaciones registradas
             </div>
           )}
@@ -130,9 +128,7 @@ export default async function TrackingPage() {
 
                 <p
                   className={`text-xs font-medium ${
-                    trade.side === "BUY"
-                      ? "text-[#2E7D5B]"
-                      : "text-[#B23A3A]"
+                    trade.side === "BUY" ? "text-[#2E7D5B]" : "text-[#B23A3A]"
                   }`}
                 >
                   {trade.side === "BUY" ? "Compra" : "Venta"}
@@ -145,14 +141,13 @@ export default async function TrackingPage() {
                   ${trade.entryPrice.toFixed(2)}
                 </p>
 
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-gray-500">
                   Cantidad: {trade.quantity}
                 </p>
               </div>
             </div>
           ))}
         </div>
-
       </div>
     </div>
   );

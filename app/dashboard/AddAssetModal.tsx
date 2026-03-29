@@ -3,46 +3,33 @@
 import { useState } from "react"
 import { FaCheck } from "react-icons/fa"
 
-const ETF_CATEGORIES = [
+const ASSET_CATEGORIES = [
   {
-    title: "📊 Índices principales",
+    title: "📊 Índices / ETFs",
     items: [
       { symbol: "SPY", name: "S&P 500" },
       { symbol: "QQQ", name: "Nasdaq 100 (Tech)" },
       { symbol: "DIA", name: "Dow Jones" },
       { symbol: "VTI", name: "Total Market" },
-    ],
-  },
-  {
-    title: "💻 Tecnología",
-    items: [
-      { symbol: "XLK", name: "Tech Sector" },
-      { symbol: "ARKK", name: "Innovation (High Risk)" },
-      { symbol: "SMH", name: "Semiconductors" },
-    ],
-  },
-  {
-    title: "⚡ Sectores",
-    items: [
-      { symbol: "XLE", name: "Energy" },
-      { symbol: "XLF", name: "Financials" },
-      { symbol: "XLV", name: "Healthcare" },
-      { symbol: "XLY", name: "Consumer Discretionary" },
-    ],
-  },
-  {
-    title: "🌎 Internacional",
-    items: [
       { symbol: "VXUS", name: "International Market" },
-      { symbol: "EFA", name: "Developed Markets" },
-      { symbol: "EEM", name: "Emerging Markets" },
+      { symbol: "SGOV", name: "Short Treasury" },
     ],
   },
   {
-    title: "🛡️ Conservadores",
+    title: "💻 Acciones (Top)",
     items: [
-      { symbol: "BND", name: "Total Bond Market" },
-      { symbol: "SGOV", name: "Short Treasury" },
+      { symbol: "AAPL", name: "Apple" },
+      { symbol: "MSFT", name: "Microsoft" },
+      { symbol: "NVDA", name: "Nvidia" },
+      { symbol: "TSLA", name: "Tesla" },
+      { symbol: "GOOGL", name: "Google" },
+    ],
+  },
+  {
+    title: "🪙 Crypto",
+    items: [
+      { symbol: "BTC-USD", name: "Bitcoin" },
+      { symbol: "ETH-USD", name: "Ethereum" },
     ],
   },
 ]
@@ -63,24 +50,22 @@ export default function AddAssetModal() {
   const handleAdd = async () => {
     setLoading(true)
 
-    for (const category of ETF_CATEGORIES) {
-      for (const etf of category.items) {
-        if (selected.includes(etf.symbol)) {
+    for (const category of ASSET_CATEGORIES) {
+      for (const asset of category.items) {
+        if (selected.includes(asset.symbol)) {
           try {
-            // 🔥 1. CREAR (con protección contra duplicados en backend idealmente)
             await fetch("/api/assets/create", {
               method: "POST",
               body: JSON.stringify({
-                symbol: etf.symbol,
-                name: etf.name,
+                symbol: asset.symbol,
+                name: asset.name,
               }),
             })
 
-            // 🔥 2. FETCH PRECIO INMEDIATO (CLAVE)
-            await fetch(`/api/prices/fetch?symbol=${etf.symbol}`)
+            await fetch(`/api/prices/fetch?symbol=${asset.symbol}`)
 
           } catch (err) {
-            console.error("Error con:", etf.symbol)
+            console.error("Error con:", asset.symbol)
           }
         }
       }
@@ -90,7 +75,6 @@ export default function AddAssetModal() {
     setSelected([])
     setOpen(false)
 
-    // 🔥 refresh limpio
     window.location.reload()
   }
 
@@ -101,7 +85,7 @@ export default function AddAssetModal() {
         onClick={() => setOpen(true)}
         className="bg-[#0F2A36] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90"
       >
-        + Agregar ETFs
+        + Agregar activos
       </button>
 
       {/* MODAL */}
@@ -113,7 +97,7 @@ export default function AddAssetModal() {
             {/* HEADER */}
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold text-[#0F2A36]">
-                Agregar ETFs
+                Agregar activos
               </h2>
 
               <button
@@ -127,20 +111,20 @@ export default function AddAssetModal() {
             {/* LISTA */}
             <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
 
-              {ETF_CATEGORIES.map((category) => (
+              {ASSET_CATEGORIES.map((category) => (
                 <div key={category.title}>
                   <p className="text-xs font-semibold text-gray-400 mb-2">
                     {category.title}
                   </p>
 
                   <div className="space-y-2">
-                    {category.items.map((etf) => {
-                      const isSelected = selected.includes(etf.symbol)
+                    {category.items.map((asset) => {
+                      const isSelected = selected.includes(asset.symbol)
 
                       return (
                         <div
-                          key={etf.symbol}
-                          onClick={() => toggle(etf.symbol)}
+                          key={asset.symbol}
+                          onClick={() => toggle(asset.symbol)}
                           className={`flex justify-between items-center p-3 rounded-xl border cursor-pointer transition
                           ${
                             isSelected
@@ -149,13 +133,15 @@ export default function AddAssetModal() {
                           }`}
                         >
                           <div>
-                            <p className="text-sm font-medium text-black">
-                              {etf.symbol}
+                            <p className={`text-sm font-medium ${
+                              isSelected ? "text-white" : "text-black"
+                            }`}>
+                              {asset.symbol}
                             </p>
                             <p className={`text-xs ${
                               isSelected ? "text-gray-200" : "text-gray-500"
                             }`}>
-                              {etf.name}
+                              {asset.name}
                             </p>
                           </div>
 

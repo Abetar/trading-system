@@ -6,6 +6,7 @@ import AddAssetModal from "./AddAssetModal";
 import DeleteButton from "./DeleteButton";
 import Link from "next/link";
 import Countdown from "./Countdown";
+import RecommendationsModal from "./RecommendationsModal";
 
 type DashboardAsset = {
   id: string;
@@ -17,42 +18,29 @@ type DashboardAsset = {
   signal: "BUY" | "SELL";
   timing: string;
   momentum: number;
+  volatility: number;
+  expectedMove: number;
+  riskLevel: "Bajo" | "Medio" | "Alto";
 };
 
-// 🔥 NUEVA FUNCIÓN: MENSAJES ACCIONABLES
-function getActionMessage(asset: DashboardAsset) {
-  const today = new Date();
+function calculateStdDev(values: number[]): number {
+  if (values.length < 2) return 0;
 
-  const options: Intl.DateTimeFormatOptions = {
-    weekday: "long",
-  };
+  const mean =
+    values.reduce((sum: number, value: number) => sum + value, 0) / values.length;
 
-  const nextDay = new Date(today);
-  nextDay.setDate(today.getDate() + 1);
+  const variance =
+    values.reduce((sum: number, value: number) => {
+      return sum + Math.pow(value - mean, 2);
+    }, 0) / values.length;
 
-  const nextNextDay = new Date(today);
-  nextNextDay.setDate(today.getDate() + 2);
+  return Math.sqrt(variance);
+}
 
-  const day1 = nextDay.toLocaleDateString("es-MX", options);
-  const day2 = nextNextDay.toLocaleDateString("es-MX", options);
-
-  if (asset.signal === "BUY") {
-    if (asset.momentum > 2) {
-      return `Si NO tienes posición → compra mañana (${day1}). Se espera subida fuerte.`;
-    }
-
-    return `Si NO tienes posición → considera comprar entre ${day1} y ${day2}.`;
-  }
-
-  if (asset.signal === "SELL") {
-    if (asset.momentum < -2) {
-      return `Si tienes posición → vende mañana (${day1}). Riesgo de caída fuerte.`;
-    }
-
-    return `Si tienes posición → considera vender entre ${day1} y ${day2}.`;
-  }
-
-  return "Sin acción clara";
+function getRiskLevel(volatility: number): "Bajo" | "Medio" | "Alto" {
+  if (volatility < 1.2) return "Bajo";
+  if (volatility < 2.5) return "Medio";
+  return "Alto";
 }
 
 export default async function Dashboard() {
@@ -72,73 +60,84 @@ export default async function Dashboard() {
   let usdToMxn = 17;
   try {
     const res = await fetch(
-      "https://api.exchangerate.host/latest?base=USD&symbols=MXN",
+      "https://api.exchangerate.host/latest?base=USD&symbols=MXN"
     );
     const data = await res.json();
     usdToMxn = data?.rates?.MXN ?? 17;
   } catch {}
 
-  const assets: DashboardAsset[] = assetsRaw.map(
-    (asset: any): DashboardAsset => {
-      const closes = asset.priceSnapshots.map((p: any) => Number(p.close));
+  const assets: DashboardAsset[] = assetsRaw.map((asset: any) => {
+    const closes = asset.priceSnapshots.map((p: any) => Number(p.close));
 
-      const latest = closes[0];
+    const latest = closes[0];
 
-      const smaShort =
-        closes.slice(0, 5).reduce((a: number, b: number) => a + b, 0) /
-        Math.min(5, closes.length);
+    const smaShort =
+      closes.slice(0, 5).reduce((a: number, b: number) => a + b, 0) /
+      Math.max(1, Math.min(5, closes.length));
 
-      const smaLong =
-        closes.slice(0, 20).reduce((a: number, b: number) => a + b, 0) /
-        Math.min(20, closes.length);
+    const smaLong =
+      closes.slice(0, 20).reduce((a: number, b: number) => a + b, 0) /
+      Math.max(1, Math.min(20, closes.length));
 
-      const momentum =
-        closes[0] && closes[5]
-          ? ((closes[0] - closes[5]) / closes[5]) * 100
-          : 0;
+    const momentum =
+      closes[0] && closes[5]
+        ? ((closes[0] - closes[5]) / closes[5]) * 100
+        : 0;
 
-      let score = 50;
+    // 🔥 retornos diarios en %
+    const dailyReturns: number[] = [];
+    for (let i = 0; i < closes.length - 1; i++) {
+      const current = closes[i];
+      const previous = closes[i + 1];
 
-      if (latest > smaShort) score += 15;
-      if (latest > smaLong) score += 25;
-      if (smaShort > smaLong) score += 20;
-      if (momentum > 0.5) score += 15;
+      if (current && previous) {
+        const dailyReturn = ((current - previous) / previous) * 100;
+        dailyReturns.push(dailyReturn);
+      }
+    }
 
-      if (latest < smaShort) score -= 15;
-      if (latest < smaLong) score -= 25;
-      if (momentum < -0.5) score -= 15;
+    // 🔥 volatilidad simple basada en std dev de retornos
+    const volatility = calculateStdDev(dailyReturns);
 
-      const signal: "BUY" | "SELL" = score >= 55 ? "BUY" : "SELL";
+    // 🔥 movimiento esperado más realista que solo momentum
+    let expectedMove = Math.max(volatility * 0.8, 0.6);
+    expectedMove = Math.min(expectedMove, 4);
 
-      const timing =
-        signal === "BUY"
-          ? momentum > 2
-            ? "🔥 Entrada fuerte (1-3 días)"
-            : "Entrada probable (2-5 días)"
-          : momentum < -2
-            ? "⚠️ Caída fuerte (1-3 días)"
-            : "Salida probable (2-5 días)";
+    const riskLevel = getRiskLevel(volatility);
 
-      return {
-        id: asset.id,
-        symbol: asset.symbol,
-        name: asset.name,
-        latest,
-        priceMXN: latest ? latest * usdToMxn : null,
-        score,
-        signal,
-        timing,
-        momentum,
-      };
-    },
-  );
+    let score = 50;
 
-  assets.sort((a: DashboardAsset, b: DashboardAsset) => b.score - a.score);
+    if (latest > smaShort) score += 15;
+    if (latest > smaLong) score += 25;
+    if (smaShort > smaLong) score += 20;
+    if (momentum > 0.5) score += 15;
 
-  if (assets.length > 0) {
-    assets[0].signal = "BUY";
-    assets[0].timing = "🔥 Mejor oportunidad actual";
-  }
+    if (latest < smaShort) score -= 15;
+    if (latest < smaLong) score -= 25;
+    if (momentum < -0.5) score -= 15;
+
+    if (volatility > 3) score -= 10;
+    if (volatility < 1.2) score += 5;
+
+    const signal: "BUY" | "SELL" = score >= 55 ? "BUY" : "SELL";
+
+    return {
+      id: asset.id,
+      symbol: asset.symbol,
+      name: asset.name,
+      latest,
+      priceMXN: latest ? latest * usdToMxn : null,
+      score,
+      signal,
+      timing: "",
+      momentum,
+      volatility,
+      expectedMove,
+      riskLevel,
+    };
+  });
+
+  assets.sort((a, b) => b.score - a.score);
 
   const top = assets[0];
 
@@ -148,66 +147,85 @@ export default async function Dashboard() {
         {/* HEADER */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-semibold text-[#0F2A36]">Dashboard</h1>
+            <h1 className="text-2xl font-semibold text-[#0F2A36]">
+              Dashboard
+            </h1>
 
-            <p className="text-sm text-gray-500">Sistema de decisiones</p>
+            <p className="text-sm text-gray-500">
+              Análisis y oportunidades de inversión
+            </p>
 
             <Countdown />
           </div>
 
-          <Link
-            href="/dashboard/tracking"
-            className="bg-[#0F2A36] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90"
-          >
-            Ver Tracking
-          </Link>
+          <div className="flex gap-2">
+            <RecommendationsModal assets={assets} />
+
+            <Link
+              href="/dashboard/tracking"
+              className="bg-[#0F2A36] text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90"
+            >
+              Ver operaciones
+            </Link>
+          </div>
         </div>
 
         {/* HERO */}
         {top && (
           <div className="bg-[#0F2A36] text-white rounded-2xl p-6 shadow-lg">
             <p className="text-xs opacity-70 flex items-center gap-2">
-              <FaFire /> Mejor oportunidad hoy
+              <FaFire /> Mejor oportunidad del momento
             </p>
 
             <div className="flex justify-between items-center mt-3">
               <div>
                 <h2 className="text-2xl font-bold">{top.symbol}</h2>
+
                 <p className="text-sm opacity-80">
-                  Score: {top.score} | {top.momentum.toFixed(2)}%
+                  Nivel de señal: {top.score} | Tendencia:{" "}
+                  {top.momentum.toFixed(2)}%
+                </p>
+
+                <p className="text-sm opacity-80 mt-1">
+                  Movimiento esperado: ±{top.expectedMove.toFixed(2)}% | Riesgo:{" "}
+                  {top.riskLevel}
                 </p>
               </div>
 
-              <div className="bg-green-500 px-4 py-2 rounded-lg font-semibold">
-                BUY
+              <div
+                className={`px-4 py-2 rounded-lg font-semibold ${
+                  top.signal === "BUY" ? "bg-green-500" : "bg-red-500"
+                }`}
+              >
+                {top.signal === "BUY" ? "Comprar" : "Vender"}
               </div>
             </div>
-
-            <p className="text-sm mt-3 opacity-80">{getActionMessage(top)}</p>
           </div>
         )}
 
         {/* CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {assets.map((asset: DashboardAsset) => (
+          {assets.map((asset) => (
             <div
               key={asset.id}
               className="relative bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition"
             >
               <DeleteButton id={asset.id} />
 
-              <div className="flex justify-between">
+              {/* HEADER */}
+              <div className="flex justify-between items-center">
                 <span className="font-semibold text-[#0F2A36]">
                   {asset.symbol}
                 </span>
 
                 <span className="text-xs text-gray-400">
-                  Score {asset.score}
+                  Señal {asset.score}
                 </span>
               </div>
 
               <p className="text-xs text-gray-500">{asset.name}</p>
 
+              {/* PRECIOS */}
               <div className="mt-3 space-y-1">
                 {asset.latest ? (
                   <>
@@ -220,53 +238,48 @@ export default async function Dashboard() {
                     </p>
                   </>
                 ) : (
-                  <p className="text-sm text-gray-400">Cargando precio...</p>
+                  <p className="text-sm text-gray-400">
+                    Precio no disponible
+                  </p>
                 )}
 
                 {Math.abs(asset.momentum) > 0.1 && (
                   <p className="text-xs text-gray-500">
-                    Momentum: {asset.momentum.toFixed(2)}%
+                    Tendencia reciente: {asset.momentum.toFixed(2)}%
                   </p>
                 )}
 
+                <p className="text-xs text-gray-500">
+                  Volatilidad: {asset.volatility.toFixed(2)}%
+                </p>
+
+                <p className="text-xs text-gray-500">
+                  Movimiento esperado: ±{asset.expectedMove.toFixed(2)}%
+                </p>
+
+                <p className="text-xs text-gray-500">
+                  Riesgo estimado: {asset.riskLevel}
+                </p>
+
+                {/* SEÑAL */}
                 <div
-                  className={
+                  className={`text-xs flex items-center gap-1 font-medium ${
                     asset.signal === "BUY"
-                      ? "text-green-600 font-medium text-xs flex items-center gap-1"
-                      : "text-red-600 font-medium text-xs flex items-center gap-1"
-                  }
+                      ? "text-[#2E7D5B]"
+                      : "text-[#B23A3A]"
+                  }`}
                 >
                   {asset.signal === "BUY" ? <FaArrowUp /> : <FaArrowDown />}
-                  {asset.signal}
+                  {asset.signal === "BUY"
+                    ? "Señal de compra"
+                    : "Señal de venta"}
                 </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* RECOMENDACIONES */}
-        <div className="bg-white border rounded-xl p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-[#0F2A36] mb-3">
-            Recomendaciones
-          </h3>
-
-          <div className="space-y-2">
-            {assets.slice(0, 5).map((a: DashboardAsset) => (
-              <div
-                key={a.id}
-                className={
-                  a.signal === "BUY"
-                    ? "p-2 rounded bg-green-50 text-green-700 text-sm"
-                    : "p-2 rounded bg-red-50 text-red-700 text-sm"
-                }
-              >
-                {a.signal === "BUY" ? "🟢 Comprar" : "🔴 Vender"} {a.symbol} —{" "}
-                {getActionMessage(a)}
-              </div>
-            ))}
-          </div>
-        </div>
-
+        {/* CTA */}
         <div className="flex justify-end">
           <AddAssetModal />
         </div>
