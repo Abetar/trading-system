@@ -14,7 +14,7 @@ type DashboardAsset = {
   name: string;
   type: string;
   latest?: number;
-  priceMXN?: number | null;
+  priceMXN?: number; // 🔥 FIX
   score: number;
   signal: "BUY" | "SELL";
   timing: string;
@@ -22,13 +22,16 @@ type DashboardAsset = {
   volatility: number;
   expectedMove: number;
   riskLevel: "Bajo" | "Medio" | "Alto";
+
+  hasPosition?: boolean;
 };
 
 function calculateStdDev(values: number[]): number {
   if (values.length < 2) return 0;
 
   const mean =
-    values.reduce((sum: number, value: number) => sum + value, 0) / values.length;
+    values.reduce((sum: number, value: number) => sum + value, 0) /
+    values.length;
 
   const variance =
     values.reduce((sum: number, value: number) => {
@@ -55,13 +58,14 @@ export default async function Dashboard() {
         orderBy: { date: "desc" },
         take: 20,
       },
+      position: true,
     },
   });
 
   let usdToMxn = 17;
   try {
     const res = await fetch(
-      "https://api.exchangerate.host/latest?base=USD&symbols=MXN"
+      "https://api.exchangerate.host/latest?base=USD&symbols=MXN",
     );
     const data = await res.json();
     usdToMxn = data?.rates?.MXN ?? 17;
@@ -81,9 +85,7 @@ export default async function Dashboard() {
       Math.max(1, Math.min(20, closes.length));
 
     const momentum =
-      closes[0] && closes[5]
-        ? ((closes[0] - closes[5]) / closes[5]) * 100
-        : 0;
+      closes[0] && closes[5] ? ((closes[0] - closes[5]) / closes[5]) * 100 : 0;
 
     const dailyReturns: number[] = [];
     for (let i = 0; i < closes.length - 1; i++) {
@@ -97,10 +99,8 @@ export default async function Dashboard() {
     }
 
     const volatility = calculateStdDev(dailyReturns);
-
     const riskLevel = getRiskLevel(volatility);
 
-    // 🔥 expectedMove por tipo
     let expectedMove: number;
     if (asset.type === "CRYPTO") {
       expectedMove = Math.max(volatility * 1.2, 1.5);
@@ -111,7 +111,6 @@ export default async function Dashboard() {
     }
     expectedMove = Math.min(expectedMove, 6);
 
-    // 🔥 score por tipo
     let score = 50;
 
     if (asset.type === "ETF" || asset.type === "STOCK") {
@@ -129,14 +128,12 @@ export default async function Dashboard() {
       if (latest > smaLong) score += 20;
       if (momentum > 0) score += 10;
       if (volatility < 2) score += 10;
-
       if (momentum < -1) score -= 20;
     }
 
     if (asset.type === "CRYPTO") {
       if (momentum > 1) score += 25;
       if (momentum > 3) score += 15;
-
       if (momentum < -2) score -= 25;
       if (volatility > 4) score -= 10;
     }
@@ -149,7 +146,7 @@ export default async function Dashboard() {
       name: asset.name,
       type: asset.type,
       latest,
-      priceMXN: latest ? latest * usdToMxn : null,
+      priceMXN: latest ? latest * usdToMxn : undefined, // 🔥 FIX
       score,
       signal,
       timing: "",
@@ -157,6 +154,7 @@ export default async function Dashboard() {
       volatility,
       expectedMove,
       riskLevel,
+      hasPosition: asset.position && Number(asset.position.quantity) > 0,
     };
   });
 
@@ -167,14 +165,10 @@ export default async function Dashboard() {
   return (
     <div className="min-h-screen bg-[#F5F6F7] p-6">
       <div className="max-w-5xl mx-auto space-y-6">
-
         {/* HEADER */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-
           <div>
-            <h1 className="text-2xl font-semibold text-[#0F2A36]">
-              Dashboard
-            </h1>
+            <h1 className="text-2xl font-semibold text-[#0F2A36]">Dashboard</h1>
 
             <p className="text-sm text-gray-500">
               Análisis y oportunidades de inversión
@@ -184,7 +178,6 @@ export default async function Dashboard() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-
             <div className="w-full sm:w-auto">
               <RecommendationsModal assets={assets} />
             </div>
@@ -195,7 +188,6 @@ export default async function Dashboard() {
             >
               Ver operaciones
             </Link>
-
           </div>
         </div>
 
@@ -264,9 +256,7 @@ export default async function Dashboard() {
                     </p>
                   </>
                 ) : (
-                  <p className="text-sm text-gray-400">
-                    Precio no disponible
-                  </p>
+                  <p className="text-sm text-gray-400">Precio no disponible</p>
                 )}
 
                 {Math.abs(asset.momentum) > 0.1 && (
@@ -289,9 +279,7 @@ export default async function Dashboard() {
 
                 <div
                   className={`text-xs flex items-center gap-1 font-medium ${
-                    asset.signal === "BUY"
-                      ? "text-[#2E7D5B]"
-                      : "text-[#B23A3A]"
+                    asset.signal === "BUY" ? "text-[#2E7D5B]" : "text-[#B23A3A]"
                   }`}
                 >
                   {asset.signal === "BUY" ? <FaArrowUp /> : <FaArrowDown />}
@@ -308,7 +296,6 @@ export default async function Dashboard() {
         <div className="flex justify-end">
           <AddAssetModal />
         </div>
-
       </div>
     </div>
   );
