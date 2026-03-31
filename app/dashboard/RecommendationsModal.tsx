@@ -13,25 +13,44 @@ type Asset = {
 function getAdvancedRecommendation(asset: Asset) {
   const today = new Date();
 
-  const nextDay = new Date(today);
-  nextDay.setDate(today.getDate() + 1);
+  // 👉 día de entrada (mañana)
+  const entryDate = new Date(today);
+  entryDate.setDate(today.getDate() + 1);
 
-  const day = nextDay.toLocaleDateString("es-MX", {
+  const entryDay = entryDate.toLocaleDateString("es-MX", {
     weekday: "long",
   });
 
   // 🔥 BASE: momentum
   let expectedMove = Math.abs(asset.momentum) * 0.6;
 
-  // 🔥 FIX: evitar 0%
+  // evitar 0%
   if (expectedMove < 0.5) {
     expectedMove = 0.8;
   }
 
-  // 🔥 límite superior
+  // límite
   expectedMove = Math.min(expectedMove, 3);
 
-  // 🔥 nueva base más clara
+  // 🔥 HOLD DAYS DINÁMICO
+  let holdDays = Math.max(1, Math.round(4 - expectedMove));
+
+  // ajuste por fuerza de señal
+  if (asset.score > 80) holdDays += 1;
+  if (asset.score < 60) holdDays -= 1;
+
+  // límites
+  holdDays = Math.min(Math.max(holdDays, 1), 7);
+
+  // 👉 fecha de salida
+  const exitDate = new Date(entryDate);
+  exitDate.setDate(entryDate.getDate() + holdDays);
+
+  const exitDay = exitDate.toLocaleDateString("es-MX", {
+    weekday: "long",
+  });
+
+  // 🔥 base inversión clara
   const baseInvestment = 1000;
   const estimatedProfit = (baseInvestment * expectedMove) / 100;
 
@@ -41,7 +60,9 @@ function getAdvancedRecommendation(asset: Asset) {
   if (asset.signal === "BUY") {
     return {
       action: "Comprar",
-      message: `Compra ${asset.symbol} el ${day}`,
+      message: `Compra ${asset.symbol} el ${entryDay}`,
+      holdText: `Mantén ${holdDays} días`,
+      exitText: `Vende el ${exitDay}`,
       expectedMove,
       estimatedProfit,
       confidence,
@@ -50,7 +71,9 @@ function getAdvancedRecommendation(asset: Asset) {
 
   return {
     action: "Vender",
-    message: `Vende ${asset.symbol} el ${day}`,
+    message: `Vende ${asset.symbol} el ${entryDay}`,
+    holdText: `Evita mantener posición`,
+    exitText: "",
     expectedMove: -expectedMove,
     estimatedProfit: -estimatedProfit,
     confidence,
@@ -74,6 +97,7 @@ export default function RecommendationsModal({ assets }: { assets: Asset[] }) {
       {open && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white text-[#1F1F1F] rounded-2xl p-6 w-full max-w-lg shadow-xl">
+
             {/* HEADER */}
             <div className="flex justify-between mb-4">
               <h2 className="text-lg font-semibold text-[#0F2A36]">
@@ -90,6 +114,7 @@ export default function RecommendationsModal({ assets }: { assets: Asset[] }) {
 
             {/* LISTA */}
             <div className="space-y-3 max-h-[400px] overflow-y-auto">
+
               {assets.slice(0, 5).map((a) => {
                 const rec = getAdvancedRecommendation(a);
 
@@ -103,11 +128,18 @@ export default function RecommendationsModal({ assets }: { assets: Asset[] }) {
                       {rec.action} {a.symbol}
                     </p>
 
-                    {/* MENSAJE */}
-                    <p className="text-sm text-gray-700">{rec.message}</p>
+                    {/* PLAN COMPLETO */}
+                    <div className="text-sm text-gray-700 space-y-1">
+                      <p>{rec.message}</p>
+                      <p className="text-gray-500">{rec.holdText}</p>
+                      {rec.exitText && (
+                        <p className="text-gray-500">{rec.exitText}</p>
+                      )}
+                    </div>
 
                     {/* METRICAS */}
                     <div className="flex justify-between mt-2 text-sm">
+
                       {/* MOVIMIENTO */}
                       <div>
                         <p className="text-xs text-gray-400">Movimiento</p>
@@ -122,26 +154,29 @@ export default function RecommendationsModal({ assets }: { assets: Asset[] }) {
                         </p>
                       </div>
 
-                      {/* GANANCIA */}
-                      <p className="text-xs text-gray-400">
-                        {rec.estimatedProfit >= 0
-                          ? "Ganancia estimada"
-                          : "Pérdida estimada"}
-                      </p>
+                      {/* GANANCIA / PERDIDA */}
+                      <div>
+                        <p className="text-xs text-gray-400">
+                          {rec.estimatedProfit >= 0
+                            ? "Ganancia estimada"
+                            : "Pérdida estimada"}
+                        </p>
 
-                      <p
-                        className={`font-medium ${
-                          rec.estimatedProfit >= 0
-                            ? "text-[#2E7D5B]"
-                            : "text-[#B23A3A]"
-                        }`}
-                      >
-                        ${Math.abs(rec.estimatedProfit).toFixed(0)} MXN
-                        <span className="block text-[10px] text-gray-400">
+                        <p
+                          className={`font-medium ${
+                            rec.estimatedProfit >= 0
+                              ? "text-[#2E7D5B]"
+                              : "text-[#B23A3A]"
+                          }`}
+                        >
+                          ${Math.abs(rec.estimatedProfit).toFixed(0)} MXN
+                        </p>
+
+                        <p className="text-[10px] text-gray-400">
                           por cada $1,000 invertidos
-                        </span>
-                      </p>
-                      
+                        </p>
+                      </div>
+
                       {/* CONFIANZA */}
                       <div>
                         <p className="text-xs text-gray-400">Confianza</p>
@@ -149,10 +184,12 @@ export default function RecommendationsModal({ assets }: { assets: Asset[] }) {
                           {rec.confidence}
                         </p>
                       </div>
+
                     </div>
                   </div>
                 );
               })}
+
             </div>
           </div>
         </div>
