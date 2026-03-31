@@ -9,20 +9,43 @@ export const authOptions: AuthOptions = {
         email: {},
       },
       async authorize(credentials) {
-        const allowedEmail = process.env.ADMIN_EMAIL
+        const adminEmails =
+          process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) ?? []
 
-        if (credentials?.email === allowedEmail) {
-          return { id: "1", email: allowedEmail }
+        if (credentials?.email && adminEmails.includes(credentials.email)) {
+          return {
+            id: credentials.email,
+            email: credentials.email,
+            isAdmin: true,
+          }
         }
 
         return null
       },
     }),
   ],
+
   pages: {
     signIn: "/login",
   },
+
   session: {
-    strategy: "jwt", // 👈 ahora TS lo acepta
+    strategy: "jwt",
+  },
+
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.isAdmin = (user as any).isAdmin ?? false
+      }
+      return token
+    },
+
+    async session({ session, token }) {
+      if (session.user) {
+        (session.user as any).isAdmin = token.isAdmin ?? false
+      }
+      return session
+    },
   },
 }
